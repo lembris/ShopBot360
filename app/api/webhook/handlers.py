@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ShopBotError
 from app.services.message_handler import message_handler
 from app.services.whatsapp import whatsapp_service
 from app.services.whatsapp_providers.models import InboundMessage
@@ -22,12 +23,16 @@ async def process_inbound_message(db: AsyncSession, msg: InboundMessage) -> None
         )
         return
     if msg.message_type == "text" and msg.text:
-        reply = await message_handler.handle_inbound(
-            db,
-            from_phone=msg.from_phone,
-            text=msg.text,
-            message_id=msg.message_id,
-        )
+        try:
+            reply = await message_handler.handle_inbound(
+                db,
+                from_phone=msg.from_phone,
+                text=msg.text,
+                message_id=msg.message_id,
+            )
+        except ShopBotError as exc:
+            logger.warning("Command error for %s: %s", msg.from_phone, exc.message)
+            reply = exc.message
         if reply:
             await whatsapp_service.send_text(msg.from_phone, reply)
 

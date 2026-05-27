@@ -29,7 +29,7 @@ def create_provider(name: str) -> WhatsAppProvider:
 def get_configured_providers() -> list[WhatsAppProvider]:
     """Primary provider first, then fallbacks that are configured."""
     settings = get_settings()
-    names = [settings.whatsapp_provider, *settings.whatsapp_fallback_providers]
+    names = [settings.whatsapp_provider, *settings.whatsapp_fallback_provider_list]
     seen: set[str] = set()
     providers: list[WhatsAppProvider] = []
 

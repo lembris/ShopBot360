@@ -16,6 +16,10 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ),
     (
         Intent.SELL,
+        re.compile(r"^sell\s+(?P<product>.+?)\s+(?P<qty>\d+)$", re.I),
+    ),
+    (
+        Intent.SELL,
         re.compile(r"^sell\s+(?P<product>.+?)$", re.I),
     ),
     (
@@ -98,6 +102,23 @@ class CommandParser:
 
         expanded = expand_synonym_line(raw)
         normalized = normalize_text(expanded)
+
+        if normalized == "report":
+            return IntentResult(
+                intent=Intent.UNKNOWN,
+                confidence=0.0,
+                raw_text=raw,
+                needs_clarification=True,
+                clarification_prompt="Try: report today, report week, or top products",
+            )
+        if normalized == "stock add":
+            return IntentResult(
+                intent=Intent.UNKNOWN,
+                confidence=0.0,
+                raw_text=raw,
+                needs_clarification=True,
+                clarification_prompt="Try: stock add sugar 50",
+            )
 
         for intent, pattern in PATTERNS:
             match = pattern.match(normalized)

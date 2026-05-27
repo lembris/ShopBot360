@@ -1,9 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
@@ -55,6 +57,20 @@ def create_app() -> FastAPI:
     app.include_router(webhook_router)
     app.include_router(admin_router)
     app.include_router(billing_router)
+
+    dashboard_dir = Path(__file__).resolve().parents[1] / "dashboard" / "dist"
+    if dashboard_dir.is_dir():
+        app.mount(
+            "/dashboard",
+            StaticFiles(directory=str(dashboard_dir), html=True),
+            name="dashboard",
+        )
+
+    @app.get("/admin", include_in_schema=False)
+    @app.head("/admin", include_in_schema=False)
+    async def admin_dashboard_redirect():
+        return RedirectResponse(url="/dashboard/")
+
     return app
 
 

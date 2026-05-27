@@ -1,43 +1,27 @@
 import { useEffect, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  fetchProducts,
-  fetchReports,
-  fetchSales,
-  getToken,
-  login,
-} from "./api";
+import CustomersPanel from "./CustomersPanel";
+import DashboardPanel from "./DashboardPanel";
+import PosPanel from "./PosPanel";
+import ProductsPanel from "./ProductsPanel";
+import SalesPanel from "./SalesPanel";
+import SettingsPanel from "./SettingsPanel";
+import { fetchReports, getToken, login } from "./api";
 
-type Tab = "products" | "sales" | "reports";
+type Tab = "dashboard" | "pos" | "products" | "sales" | "customers" | "reports" | "settings";
 
 export default function App() {
   const [token, setToken] = useState(getToken());
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [tab, setTab] = useState<Tab>("products");
-  const [products, setProducts] = useState<
-    Array<{ id: string; name: string; price: number; stock_qty: number }>
-  >([]);
-  const [sales, setSales] = useState<
-    Array<{ receipt_no: string; total_amount: number; sold_at: string | null }>
-  >([]);
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [reports, setReports] = useState<{ today: string; week: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || tab !== "reports") return;
     (async () => {
       try {
-        if (tab === "products") setProducts(await fetchProducts());
-        if (tab === "sales") setSales(await fetchSales());
-        if (tab === "reports") setReports(await fetchReports());
+        setReports(await fetchReports());
       } catch (e) {
         setError(String(e));
       }
@@ -61,7 +45,12 @@ export default function App() {
         <h1>ShopBot Admin</h1>
         <div className="card" style={{ display: "grid", gap: "0.75rem" }}>
           <input placeholder="Phone (+255...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
           <button onClick={handleLogin}>Sign in</button>
           {error && <p style={{ color: "crimson" }}>{error}</p>}
         </div>
@@ -69,13 +58,8 @@ export default function App() {
     );
   }
 
-  const chartData = sales.slice(0, 7).map((s) => ({
-    name: s.receipt_no.split("-").pop() || s.receipt_no,
-    amount: s.total_amount,
-  }));
-
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", padding: "1.5rem" }}>
+    <div style={{ maxWidth: tab === "pos" ? 1400 : 1200, margin: "0 auto", padding: "1.5rem" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>ShopBot Dashboard</h1>
         <button
@@ -88,11 +72,14 @@ export default function App() {
         </button>
       </header>
 
-      <nav style={{ display: "flex", gap: "0.5rem", margin: "1rem 0" }}>
-        {(["products", "sales", "reports"] as Tab[]).map((t) => (
+      <nav style={{ display: "flex", gap: "0.5rem", margin: "1rem 0", flexWrap: "wrap" }}>
+        {(["dashboard", "pos", "products", "sales", "customers", "reports", "settings"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t);
+              setError("");
+            }}
             style={{ background: tab === t ? "#0f766e" : "#94a3b8" }}
           >
             {t}
@@ -100,54 +87,13 @@ export default function App() {
         ))}
       </nav>
 
-      {tab === "products" && (
-        <div className="card">
-          <h2>Products</h2>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th align="left">Name</th>
-                <th align="right">Price</th>
-                <th align="right">Stock</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td align="right">{p.price.toLocaleString()} TZS</td>
-                  <td align="right">{p.stock_qty}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
 
-      {tab === "sales" && (
-        <>
-          <div className="card" style={{ marginBottom: "1rem" }}>
-            <h2>Recent sales</h2>
-            <ul>
-              {sales.map((s) => (
-                <li key={s.receipt_no}>
-                  {s.receipt_no} — {s.total_amount.toLocaleString()} TZS
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="card" style={{ height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="amount" fill="#0d9488" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
+      {tab === "dashboard" && <DashboardPanel />}
+      {tab === "pos" && <PosPanel />}
+      {tab === "products" && <ProductsPanel />}
+      {tab === "sales" && <SalesPanel />}
+      {tab === "customers" && <CustomersPanel />}
 
       {tab === "reports" && reports && (
         <div className="card">
@@ -156,6 +102,8 @@ export default function App() {
           <pre style={{ whiteSpace: "pre-wrap" }}>{reports.week}</pre>
         </div>
       )}
+
+      {tab === "settings" && <SettingsPanel />}
     </div>
   );
 }

@@ -24,6 +24,8 @@ from app.services.whatsapp import whatsapp_service
 logger = logging.getLogger(__name__)
 parser = CommandParser()
 
+SESSION_CANCEL_WORDS = {"cancel", "stop", "exit", "quit", "acha", "futa", "bila"}
+
 SALES_INTENTS = {Intent.SELL}
 INVENTORY_INTENTS = {
     Intent.STOCK_ADD,
@@ -71,12 +73,23 @@ class MessageHandler:
 
         session = await session_service.get(str(shop.id), phone)
         if session and session.get("pending_intent"):
-            return await self._continue_session(
-                db, shop, user, phone, text, session
-            )
+            if text.strip().lower() in SESSION_CANCEL_WORDS:
+                await session_service.clear(str(shop.id), phone)
+                return "Sale cancelled. Send 'help' for commands."
+            fresh_intent = parser.parse(text)
+            if fresh_intent.intent != Intent.UNKNOWN and fresh_intent.confidence >= 0.6:
+                await session_service.clear(str(shop.id), phone)
+            else:
+                return await self._continue_session(
+                    db, shop, user, phone, text, session
+                )
 
         intent = parser.parse(text)
-        if intent.confidence < settings.ai_confidence_threshold and intent.intent == Intent.UNKNOWN:
+        if (
+            intent.intent == Intent.UNKNOWN
+            and intent.confidence < settings.ai_confidence_threshold
+            and not intent.clarification_prompt
+        ):
             intent = await ai_fallback_service.parse(text)
 
         if intent.needs_clarification and intent.intent == Intent.SELL:
@@ -90,6 +103,23 @@ class MessageHandler:
                 },
             )
             return intent.clarification_prompt or "How many?"
+
+        if (
+            intent.intent == Intent.SELL
+            and intent.entities.qty
+            and not intent.entities.price
+        ):
+            await session_service.set(
+                str(shop.id),
+                phone,
+                {
+                    "pending_intent": Intent.SELL,
+                    "product": intent.entities.product,
+                    "qty": intent.entities.qty,
+                    "step": "price",
+                },
+            )
+            return "Price per item?"
 
         return await self._dispatch(
             db,
