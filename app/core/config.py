@@ -18,10 +18,28 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://shopbot:shopbot@localhost:5432/shopbot"
     redis_url: str = "redis://localhost:6379/0"
 
+    # WhatsApp provider: meta | twilio | dialog360 | wati
+    whatsapp_provider: str = "twilio"
+    whatsapp_fallback_providers: str = "wati,dialog360,meta"
+
+    # Meta Cloud API (direct)
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_verify_token: str = "your-verify-token"
     whatsapp_api_version: str = "v21.0"
+
+    # Twilio WhatsApp (recommended without Meta direct access)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = ""  # e.g. whatsapp:+14155238886
+
+    # 360dialog BSP
+    dialog360_api_key: str = ""
+    dialog360_base_url: str = "https://waba-v2.360dialog.io"
+
+    # WATI.io
+    wati_api_token: str = ""
+    wati_api_base_url: str = ""  # e.g. https://live-server.wati.io
 
     allowed_phones: str = "+255700000000"
     jwt_secret: str = "change-me-jwt-secret"
@@ -49,6 +67,10 @@ class Settings(BaseSettings):
     @property
     def allowed_phone_list(self) -> list[str]:
         return [p.strip() for p in self.allowed_phones.split(",") if p.strip()]
+
+    @property
+    def whatsapp_fallback_provider_list(self) -> list[str]:
+        return [p.strip() for p in self.whatsapp_fallback_providers.split(",") if p.strip()]
 
 
 @lru_cache

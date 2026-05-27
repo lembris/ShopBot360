@@ -12,7 +12,21 @@ Production-grade WhatsApp commerce assistant for small shops — POS, inventory,
 - **Admin UI:** React (Vite) in `dashboard/`
 - **Mobile:** Flutter in `mobile/`
 
-## Quick start
+## Deploy to a server
+
+**Full guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
+```bash
+cp .env.production.example .env   # edit secrets + Twilio credentials
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh bot.yourdomain.com
+```
+
+Point Twilio webhook to `https://bot.yourdomain.com/webhook`.
+
+---
+
+## Quick start (local dev)
 
 ### 1. Environment
 
@@ -43,11 +57,26 @@ python scripts/seed_data.py
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 5. Meta webhook
+### 5. WhatsApp (multi-vendor — no Meta direct access required)
 
-- Point webhook to `https://<your-host>/webhook`
-- Verify token must match `WHATSAPP_VERIFY_TOKEN`
-- Use ngrok for local dev: `ngrok http 8000`
+Set `WHATSAPP_PROVIDER` in `.env`:
+
+| Provider | Best for | Webhook URL |
+|----------|----------|-------------|
+| **twilio** (default) | Dev sandbox, no Meta Business account | `POST /webhook` or `/webhook/twilio` |
+| **wati** | SMB onboarding in East Africa / India | `POST /webhook/wati` |
+| **dialog360** | Production via Meta BSP partner | `POST /webhook/dialog360` |
+| **meta** | Direct Meta Cloud API (when approved) | `GET/POST /webhook` |
+
+See [docs/WHATSAPP_PROVIDERS.md](docs/WHATSAPP_PROVIDERS.md) for step-by-step setup.
+
+**Twilio Sandbox (quickest start):**
+1. Create a Twilio account and open WhatsApp Sandbox.
+2. Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`.
+3. Point sandbox webhook to `https://<ngrok-host>/webhook`.
+4. Join sandbox from your phone, then message the bot.
+
+Use ngrok for local dev: `ngrok http 8000`
 
 ### 6. Ollama (optional, Phase 2 AI)
 
@@ -125,7 +154,8 @@ pytest app/tests -v
 
 ## Production
 
-- Use `docker/docker-compose.yml` with nginx + SSL (Let's Encrypt)
+- Use `docker/docker-compose.prod.yml` (migrations on startup, no dev reload)
+- HTTPS via Let's Encrypt — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 - Run `scripts/backup.sh` via cron for PostgreSQL backups
 - Set `SENTRY_DSN` for error tracking
 

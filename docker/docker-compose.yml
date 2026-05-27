@@ -19,15 +19,16 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: shopbot
-      POSTGRES_PASSWORD: shopbot
-      POSTGRES_DB: shopbot
+      POSTGRES_USER: ${POSTGRES_USER:-shopbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shopbot}
+      POSTGRES_DB: ${POSTGRES_DB:-shopbot}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shopbot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shopbot} -d ${POSTGRES_DB:-shopbot}"]
       interval: 5s
       timeout: 5s
       retries: 5

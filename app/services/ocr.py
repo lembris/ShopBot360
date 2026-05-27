@@ -4,32 +4,28 @@ import logging
 import tempfile
 from pathlib import Path
 
-import httpx
-
 from app.core.config import get_settings
+from app.services.whatsapp import whatsapp_service
 
 logger = logging.getLogger(__name__)
 
 
 class OCRService:
-    async def download_image(self, media_id: str) -> bytes | None:
-        settings = get_settings()
-        if not settings.whatsapp_token:
-            return None
-        url = f"https://graph.facebook.com/{settings.whatsapp_api_version}/{media_id}"
-        headers = {"Authorization": f"Bearer {settings.whatsapp_token}"}
-        async with httpx.AsyncClient() as client:
-            meta = await client.get(url, headers=headers)
-            meta.raise_for_status()
-            media_url = meta.json().get("url")
-            if not media_url:
-                return None
-            img = await client.get(media_url, headers=headers)
-            img.raise_for_status()
-            return img.content
+    async def download_image(
+        self,
+        media_id: str | None = None,
+        *,
+        media_url: str | None = None,
+    ) -> bytes | None:
+        return await whatsapp_service.download_media(media_id, media_url=media_url)
 
-    async def parse_receipt_image(self, media_id: str) -> str | None:
-        data = await self.download_image(media_id)
+    async def parse_receipt_image(
+        self,
+        media_id: str | None = None,
+        *,
+        media_url: str | None = None,
+    ) -> str | None:
+        data = await self.download_image(media_id, media_url=media_url)
         if not data:
             return None
         try:
