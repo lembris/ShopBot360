@@ -70,6 +70,8 @@ async def seed() -> None:
         print(f"Seeded shop '{shop.name}' (id={shop.id})")
         print(f"Owner phone: {phone}, password: changeme")
 
+        await db.commit()
+
 
 if __name__ == "__main__":
     asyncio.run(seed())

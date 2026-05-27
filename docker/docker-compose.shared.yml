@@ -1,0 +1,116 @@
+# Shared-server deployment (no nginx — use host reverse proxy on mnh-network)
+# Usage:
+#   docker compose -p shopbot -f docker/docker-compose.shared.yml --env-file .env up -d --build
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: shopbot_api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shopbot}:${POSTGRES_PASSWORD}@shopbot_postgres:5432/${POSTGRES_DB:-shopbot}
+      REDIS_URL: redis://shopbot_redis:6379/0
+      CELERY_BROKER_URL: redis://shopbot_redis:6379/1
+      CELERY_RESULT_BACKEND: redis://shopbot_redis:6379/2
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    networks:
+      - shopbot
+      - mnh-network
+
+  postgres:
+    image: postgres:16
+    container_name: shopbot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-shopbot}
+    volumes:
+      - /opt/mnh-data/shopbot-postgres:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shopbot} -d ${POSTGRES_DB:-shopbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shopbot
+
+  redis:
+    image: redis:7-alpine
+    container_name: shopbot_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    networks:
+      - shopbot
+
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: shopbot_celery_worker
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shopbot}:${POSTGRES_PASSWORD}@shopbot_postgres:5432/${POSTGRES_DB:-shopbot}
+      REDIS_URL: redis://shopbot_redis:6379/0
+      CELERY_BROKER_URL: redis://shopbot_redis:6379/1
+      CELERY_RESULT_BACKEND: redis://shopbot_redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    networks:
+      - shopbot
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: shopbot_celery_beat
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shopbot}:${POSTGRES_PASSWORD}@shopbot_postgres:5432/${POSTGRES_DB:-shopbot}
+      CELERY_BROKER_URL: redis://shopbot_redis:6379/1
+      CELERY_RESULT_BACKEND: redis://shopbot_redis:6379/2
+    depends_on:
+      - celery-worker
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    networks:
+      - shopbot
+
+networks:
+  shopbot:
+    name: shopbot-network
+  mnh-network:
+    name: mnh-network
+    external: true
+
+volumes:
+  redisdata:
+    name: shopbot_redisdata

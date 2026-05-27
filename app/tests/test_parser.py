@@ -18,8 +18,24 @@ def test_sell_with_customer():
 
 def test_swahili_uza_synonym():
     result = CommandParser().parse("uza maji 3")
-    # May need clarification without price
     assert result.intent in (Intent.SELL, Intent.UNKNOWN) or result.needs_clarification
+
+
+def test_swahili_uza_soda_mbili():
+    result = CommandParser().parse("uza soda mbili")
+    assert result.intent == Intent.SELL
+    assert result.entities.qty == 2
+    assert result.entities.product == "soda"
+
+
+def test_report_partial():
+    result = CommandParser().parse("report")
+    assert "report today" in (result.clarification_prompt or "").lower()
+
+
+def test_stock_add_partial():
+    result = CommandParser().parse("stock add")
+    assert "stock add sugar" in (result.clarification_prompt or "").lower()
 
 
 def test_stock_add():
